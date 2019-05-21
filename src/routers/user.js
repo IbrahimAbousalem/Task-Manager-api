@@ -38,7 +38,8 @@ userRouter.post('/users/login', async (req, res)=>{
 })
 
 userRouter.post('/users/me/avatar', auth, avatar.single('avatar'), async(req, res)=>{
-    req.user.avatar = req.file.buffer
+    const buffer = await sharp(req.file.buffer).resize({width: 250, height: 250}).png().toBuffer()
+    req.user.avatar = buffer
     await req.user.save()
     res.send()
 }, (error, req, res, next)=>{
@@ -76,7 +77,7 @@ userRouter.get('/users/:id/avatar', async(req, res)=>{
         if(!user || !user.avatar){
             throw new Error()
         }
-        res.set('content-type','image/jgp')
+        res.set('content-type','image/png')
         res.send(user.avatar)
     } catch (e) {
         res.status(400).send()
