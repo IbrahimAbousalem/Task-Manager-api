@@ -1,9 +1,21 @@
 const express= require('express')
+const multer = require('multer')
+const sharp = require('sharp')
 const User = require('../model/user')
 const auth = require('../middleware/auth')
 
 const userRouter = express.Router() 
-
+const avatar = multer({
+        limits: {
+        fileSize: 1000000
+    },
+    fileFilter(req, file, cb){
+        if(!file.originalname.match(/\.(jpg|jpeg|png)$/)){
+            return cb(new Error('please upload an image!'))
+        }
+        cb(undefined, true)
+    }
+})
 userRouter.post('/users', async(req, res)=>{
     const user = new User(req.body)
     try {
@@ -23,6 +35,14 @@ userRouter.post('/users/login', async (req, res)=>{
     } catch (e) {
         res.status(400).send()
     }
+})
+
+userRouter.post('/users/me/avatar', auth, avatar.single('avatar'), async(req, res)=>{
+    req.user.avatar = req.file.buffer
+    await req.user.save()
+    res.send()
+}, (error, req, res, next)=>{
+    res.status(400).send({error: error.message})
 })
 
 userRouter.post('/users/logout', auth, async(req, res)=>{
@@ -49,6 +69,20 @@ userRouter.get('/users/me', auth, async(req, res)=>{
     res.send(req.user)
 })
 
+userRouter.get('/users/:id/avatar', async(req, res)=>{
+    try {
+        const user = await User.findById(req.params.id)
+
+        if(!user || !user.avatar){
+            throw new Error()
+        }
+        res.set('content-type','image/jgp')
+        res.send(user.avatar)
+    } catch (e) {
+        res.status(400).send()
+    }
+})
+
 userRouter.patch('/users/me', auth, async(req, res)=>{
     const updates = Object.keys(req.body)
     const allowedUpdates = ['name', 'email', 'password','age']
@@ -67,15 +101,15 @@ userRouter.patch('/users/me', auth, async(req, res)=>{
 
 userRouter.delete('/users/me', auth, async (req, res)=>{
     try {
-        // const user = await User.findByIdAndDelete(req.user._id)
-        // if(!user){
-        //     res.status(404).send()
-        // }
         await req.user.remove()
         res.send(req.user)
     } catch (e) {
         res.status(500).send(e)
     }
 })
-
-module.exports = userRouter
+userRouter.delete('/users/me/avatar', auth, async(req, res)=>{
+    req.user.avatar = undefined
+    await req.user.save()
+    res.send()
+})
+module.exports = userRouter 
